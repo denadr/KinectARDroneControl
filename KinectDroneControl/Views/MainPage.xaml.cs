@@ -28,7 +28,7 @@ namespace KinectDroneControl.Views
         private const double c_InferredBoneThickness = 1.0;
         private const double c_ClipBoundsThickness = 5;
         private const float c_InferredZPositionClamp = 0.1f;
-        private KinectSensor m_Kinect = null;
+        private KinectSensor m_KinectSensor = null;
         private CoordinateMapper m_CoordinateMapper = null;
         private BodyFrameReader m_BodyFrameReader = null;
         private Body[] m_Bodies = null;
@@ -65,16 +65,16 @@ namespace KinectDroneControl.Views
 
         private void InitializeKinect()
         {
-            m_Kinect = KinectSensor.GetDefault();
-            m_CoordinateMapper = m_Kinect.CoordinateMapper;
-            var frameDescription = m_Kinect.DepthFrameSource.FrameDescription;// get the depth (display) extents
+            m_KinectSensor = KinectSensor.GetDefault();
+            m_CoordinateMapper = m_KinectSensor.CoordinateMapper;
+            var frameDescription = m_KinectSensor.DepthFrameSource.FrameDescription;// get the depth (display) extents
             // get size of joint space
             m_JointSpaceWidth = frameDescription.Width;
             m_JointSpaceHeight = frameDescription.Height;
-            m_Bodies = new Body[m_Kinect.BodyFrameSource.BodyCount];// get total number of bodies from BodyFrameSource
-            m_BodyFrameReader = m_Kinect.BodyFrameSource.OpenReader();
+            m_Bodies = new Body[m_KinectSensor.BodyFrameSource.BodyCount];// get total number of bodies from BodyFrameSource
+            m_BodyFrameReader = m_KinectSensor.BodyFrameSource.OpenReader();
             m_BodyFrameReader.FrameArrived += Reader_BodyFrameArrived;
-            m_Kinect.IsAvailableChanged += Sensor_IsAvailableChanged;
+            m_KinectSensor.IsAvailableChanged += Sensor_IsAvailableChanged;
             m_BodyColors = new List<Color>
             {
                 Colors.Red,
@@ -86,11 +86,11 @@ namespace KinectDroneControl.Views
             };
             // sets total number of possible tracked bodies
             // create ellipses and lines for drawing bodies
-            m_BodyCount = m_Kinect.BodyFrameSource.BodyCount;
+            m_BodyCount = m_KinectSensor.BodyFrameSource.BodyCount;
             m_DrawingCanvas = new Canvas();
-            m_Kinect.Open();
+            m_KinectSensor.Open();
 
-            StatusText = m_Kinect.IsAvailable ? m_ResourceLoader.GetString("RunningStatusText")
+            StatusText = m_KinectSensor.IsAvailable ? m_ResourceLoader.GetString("RunningStatusText")
                                                             : m_ResourceLoader.GetString("NoSensorStatusText");
         }
 
@@ -128,10 +128,10 @@ namespace KinectDroneControl.Views
                         body.Dispose();
                 }
             }
-            if (m_Kinect != null)
+            if (m_KinectSensor != null)
             {
-                m_Kinect.Close();
-                m_Kinect = null;
+                m_KinectSensor.Close();
+                m_KinectSensor = null;
             }
         }
 
@@ -325,7 +325,7 @@ namespace KinectDroneControl.Views
 
         private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
         {
-            if (!m_Kinect.IsAvailable)
+            if (!m_KinectSensor.IsAvailable)
                 StatusText = m_ResourceLoader.GetString("SensorNotAvailableStatusText");
             else
                 StatusText = m_ResourceLoader.GetString("RunningStatusText");
@@ -336,7 +336,7 @@ namespace KinectDroneControl.Views
             var joints = body.Joints;
             var jointPointsInDepthSpace = new Dictionary<JointType, Point>();
             var bodyInfo = m_BodyInfos[bodyIndex];
-            var coordinateMapper = m_Kinect.CoordinateMapper;
+            var coordinateMapper = m_KinectSensor.CoordinateMapper;
             foreach (var jointType in body.Joints.Keys)
             {
                 // sometimes the depth(Z) of an inferred joint may show as negative

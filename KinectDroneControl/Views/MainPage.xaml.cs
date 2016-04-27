@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using ARDrone2Client.Common;
+using GalaSoft.MvvmLight.Command;
 using KinectDroneControl.Extensions.Kinect;
 using KinectDroneControl.KinectDroneInterface;
-using Windows.ApplicationModel.Resources;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Popups;
@@ -18,9 +19,9 @@ using WindowsPreview.Kinect;
 
 namespace KinectDroneControl.Views
 {
-    public sealed partial class MainPage : Page, INotifyPropertyChanged
+    public sealed partial class MainPage : Page, INotifyPropertyChanged, IDisposable
     {
-        private ResourceLoader m_ResourceLoader = ResourceLoader.GetForCurrentView("Resources");
+        #region Constants
         private const double c_HighConfidenceHandSize = 40;
         private const double c_LowConfidenceHandSize = 20;
         private const double c_JointThickness = 8.0;
@@ -28,19 +29,34 @@ namespace KinectDroneControl.Views
         private const double c_InferredBoneThickness = 1.0;
         private const double c_ClipBoundsThickness = 5;
         private const float c_InferredZPositionClamp = 0.1f;
-        private KinectSensor m_KinectSensor = null;
-        private CoordinateMapper m_CoordinateMapper = null;
-        private BodyFrameReader m_BodyFrameReader = null;
-        private Body[] m_Bodies = null;
-        private Canvas m_DrawingCanvas;
+        #endregion
+
+        #region Private Members
+        private float m_JointSpaceWidth;
+        private float m_JointSpaceHeight;
+
+        private KinectSensor m_KinectSensor;
+        private BodyFrameReader m_BodyFrameReader;
+        private Body[] m_Bodies;
+        private Canvas m_Canvas;
         private BodyInfo[] m_BodyInfos;
-        private List<Color> m_BodyColors;
+        private List<Color> m_BodyColors = new List<Color>
+            {
+                Colors.Red,
+                Colors.Orange,
+                Colors.Green,
+                Colors.Blue,
+                Colors.Indigo,
+                Colors.Violet
+            };
         private Rectangle m_LeftClipEdge;
         private Rectangle m_RightClipEdge;
         private Rectangle m_TopClipEdge;
         private Rectangle m_BottomClipEdge;
+
         private int m_BodyCount
         {
+            get { return m_BodyInfos == null ? 0 : m_BodyInfos.Length; }
             set
             {
                 if (value == 0)
@@ -56,50 +72,12 @@ namespace KinectDroneControl.Views
                         m_BodyInfos[bodyIndex] = new BodyInfo(m_BodyColors[bodyIndex]);
                 }
             }
-            get { return m_BodyInfos == null ? 0 : m_BodyInfos.Length; }
         }
-        private float m_JointSpaceWidth;
-        private float m_JointSpaceHeight;
 
         private IGestureTranslator m_Translator = new GestureTranslator();
+        #endregion
 
-        private void InitializeKinect()
-        {
-            m_KinectSensor = KinectSensor.GetDefault();
-            m_CoordinateMapper = m_KinectSensor.CoordinateMapper;
-            var frameDescription = m_KinectSensor.DepthFrameSource.FrameDescription;// get the depth (display) extents
-            // get size of joint space
-            m_JointSpaceWidth = frameDescription.Width;
-            m_JointSpaceHeight = frameDescription.Height;
-            m_Bodies = new Body[m_KinectSensor.BodyFrameSource.BodyCount];// get total number of bodies from BodyFrameSource
-            m_BodyFrameReader = m_KinectSensor.BodyFrameSource.OpenReader();
-            m_BodyFrameReader.FrameArrived += Reader_BodyFrameArrived;
-            m_KinectSensor.IsAvailableChanged += Sensor_IsAvailableChanged;
-            m_BodyColors = new List<Color>
-            {
-                Colors.Red,
-                Colors.Orange,
-                Colors.Green,
-                Colors.Blue,
-                Colors.Indigo,
-                Colors.Violet
-            };
-            // sets total number of possible tracked bodies
-            // create ellipses and lines for drawing bodies
-            m_BodyCount = m_KinectSensor.BodyFrameSource.BodyCount;
-            m_DrawingCanvas = new Canvas();
-            m_KinectSensor.Open();
-
-            StatusText = m_KinectSensor.IsAvailable ? m_ResourceLoader.GetString("RunningStatusText")
-                                                            : m_ResourceLoader.GetString("NoSensorStatusText");
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        private void RaisePropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
+        #region Public Fields
         private string m_StatusText;
         public string StatusText
         {
@@ -113,7 +91,187 @@ namespace KinectDroneControl.Views
                 }
             }
         }
+
+        private bool m_ControlLocked;
+        public bool ControlLocked
+        {
+            get { return m_ControlLocked; }
+            set
+            {
+                if (value != m_ControlLocked)
+                {
+                    m_ControlLocked = value;
+                    RaisePropertyChanged(nameof(ControlLocked));
+                }
+            }
+        }
+
+        private int m_BatteryState;
+        public int BatteryState
+        {
+            get { return m_BatteryState; }
+            set
+            {
+                if (value != m_BatteryState)
+                {
+                    m_BatteryState = value;
+                    RaisePropertyChanged(nameof(BatteryState));
+                }
+            }
+        }
+
+        private bool m_IsConnected;
+        public bool IsConnected
+        {
+            get { return m_IsConnected; }
+            set
+            {
+                if (value != m_IsConnected)
+                {
+                    m_IsConnected = value;
+                    RaisePropertyChanged(nameof(IsConnected));
+                }
+            }
+        }
+
+        private bool m_IsFlying;
+        public bool IsFlying
+        {
+            get { return m_IsFlying; }
+            set
+            {
+                if (value != m_IsFlying)
+                {
+                    m_IsFlying = value;
+                    RaisePropertyChanged(nameof(IsFlying));
+                }
+            }
+        }
+        #endregion
+
+        #region Commands
+        private ICommand m_ConnectDisconnectCommand;
+        public ICommand ConnectDisconnectCommand
+        {
+            get
+            {
+                return m_ConnectDisconnectCommand ?? (m_ConnectDisconnectCommand = new RelayCommand(ConnectDisconnect));
+            }
+        }
+
+        private ICommand m_TakeoffLandCommand;
+        public ICommand TakeoffLandCommand
+        {
+            get
+            {
+                return m_TakeoffLandCommand ?? (m_TakeoffLandCommand = new RelayCommand(TakeoffLand));
+            }
+        }
+
+        private ICommand m_ControlLockCommand;
+        public ICommand ControlLockCommand
+        {
+            get
+            {
+                return m_ControlLockCommand ?? (m_ControlLockCommand = new RelayCommand(LockControl));
+            }
+        }
+        #endregion
+
+        #region PropertyChanged
+        public event PropertyChangedEventHandler PropertyChanged;
+        public void RaisePropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
+
+        #region Contruction & Diposing
+        public MainPage()
+        {
+            //InitializeDrone();
+            InitializeKinect();
+
+            DataContext = this;
+            InitializeComponent();
+
+            m_Canvas.Clip = new RectangleGeometry();// set the clip rectangle to prevent rendering outside the canvas
+            m_Canvas.Clip.Rect = new Rect(0.0, 0.0, DisplayGrid.Width, DisplayGrid.Height);
+            PopulateVisualObjects();
+            DisplayGrid.Children.Add(m_Canvas);
+            ResetFactors();
+            UpdateUIElements();
+            //VideoGrid.Children.Add(DroneVideoElem);
+            //DroneVideoElem.Visibility = Visibility.Collapsed;
+        }
+
+        private void PopulateVisualObjects()
+        {
+            // create clipped edges and set to collapsed initially
+            m_LeftClipEdge = new Rectangle()
+            {
+                Fill = new SolidColorBrush(Colors.Red),
+                Width = c_ClipBoundsThickness,
+                Height = DisplayGrid.Height,
+                Visibility = Visibility.Collapsed
+            };
+            m_RightClipEdge = new Rectangle()
+            {
+                Fill = new SolidColorBrush(Colors.Red),
+                Width = c_ClipBoundsThickness,
+                Height = DisplayGrid.Height,
+                Visibility = Visibility.Collapsed
+            };
+            m_TopClipEdge = new Rectangle()
+            {
+                Fill = new SolidColorBrush(Colors.Red),
+                Width = DisplayGrid.Width,
+                Height = c_ClipBoundsThickness,
+                Visibility = Visibility.Collapsed
+            };
+            m_BottomClipEdge = new Rectangle()
+            {
+                Fill = new SolidColorBrush(Colors.Red),
+                Width = DisplayGrid.Width,
+                Height = c_ClipBoundsThickness,
+                Visibility = Visibility.Collapsed
+            };
+            foreach (var bodyInfo in m_BodyInfos)
+            {
+                // add left and right hand ellipses of all bodies to canvas
+                m_Canvas.Children.Add(bodyInfo.HandLeftEllipse);
+                m_Canvas.Children.Add(bodyInfo.HandRightEllipse);
+                foreach (var joint in bodyInfo.JointPoints)// add joint ellipses of all bodies to canvas
+                {
+                    m_Canvas.Children.Add(joint.Value);
+                }
+                foreach (var bone in bodyInfo.Bones)// add bone lines of all bodies to canvas
+                {
+                    m_Canvas.Children.Add(bodyInfo.BoneLines[bone]);
+                }
+            }
+            // add clipped edges rectangles to main canvas
+            m_Canvas.Children.Add(m_LeftClipEdge);
+            m_Canvas.Children.Add(m_RightClipEdge);
+            m_Canvas.Children.Add(m_TopClipEdge);
+            m_Canvas.Children.Add(m_BottomClipEdge);
+            // position the clipped edges
+            Canvas.SetLeft(m_LeftClipEdge, 0);
+            Canvas.SetTop(m_LeftClipEdge, 0);
+            Canvas.SetLeft(m_RightClipEdge, DisplayGrid.Width - c_ClipBoundsThickness);
+            Canvas.SetTop(m_RightClipEdge, 0);
+            Canvas.SetLeft(m_TopClipEdge, 0);
+            Canvas.SetTop(m_TopClipEdge, 0);
+            Canvas.SetLeft(m_BottomClipEdge, 0);
+            Canvas.SetTop(m_BottomClipEdge, DisplayGrid.Height - c_ClipBoundsThickness);
+        }
+
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Dispose();
+        }
+
+        public void Dispose()
         {
             if (m_BodyFrameReader != null)
             {
@@ -134,8 +292,30 @@ namespace KinectDroneControl.Views
                 m_KinectSensor = null;
             }
         }
+        #endregion
 
-        private void Reader_BodyFrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        #region Kinect
+        private void InitializeKinect()
+        {
+            m_KinectSensor = KinectSensor.GetDefault();
+            var frameDescription = m_KinectSensor.DepthFrameSource.FrameDescription;// get the depth (display) extents
+            // get size of joint space
+            m_JointSpaceWidth = frameDescription.Width;
+            m_JointSpaceHeight = frameDescription.Height;
+            m_Bodies = new Body[m_KinectSensor.BodyFrameSource.BodyCount];// get total number of bodies from BodyFrameSource
+            m_BodyFrameReader = m_KinectSensor.BodyFrameSource.OpenReader();
+            m_BodyFrameReader.FrameArrived += Reader_BodyFrameArrived;
+            m_KinectSensor.IsAvailableChanged += KinectSensor_IsAvailableChanged;
+            // sets total number of possible tracked bodies
+            // create ellipses and lines for drawing bodies
+            m_Canvas = new Canvas();
+            m_KinectSensor.Open();
+            m_BodyCount = m_KinectSensor.BodyFrameSource.BodyCount;
+
+            StatusText = m_KinectSensor.IsAvailable ? "Kinect Sensor is running!" : "No ready Kinect Sensor found!";
+        }
+
+        private async void Reader_BodyFrameArrived(object sender, BodyFrameArrivedEventArgs e)
         {
             bool dataReceived = false;
             bool hasTrackedBody = false;
@@ -149,49 +329,57 @@ namespace KinectDroneControl.Views
             }
             if (dataReceived)
             {
-                BeginBodiesUpdate();
                 for (int bodyIndex = 0; bodyIndex < m_Bodies.Length; bodyIndex++)
                 {
                     var body = m_Bodies[bodyIndex];
                     if (body.IsTracked)
                     {
-                        // check if this body clips an edge
                         UpdateClippedEdges(body, hasTrackedBody);
-                        UpdateBody(body, bodyIndex);
+                        await UpdateBody(body, m_BodyInfos[bodyIndex]);
 
                         hasTrackedBody = true;
                     }
                     else
                         m_BodyInfos[bodyIndex].Clear();// collapse this body from canvas as it goes out of view
-                        //ClearBody(bodyIndex);
                 }
                 if (!hasTrackedBody)
                     ClearClippedEdges();
             }
         }
 
-        private void BeginBodiesUpdate()
+        private async Task UpdateBody(Body body, BodyInfo bodyInfo)
         {
-            if (m_BodyInfos != null)
+            var joints = body.Joints;
+            var jointPointsInDepthSpace = new Dictionary<JointType, Point>();
+            var coordinateMapper = m_KinectSensor.CoordinateMapper;
+            foreach (var jointType in body.Joints.Keys)
             {
-                foreach (var bodyInfo in m_BodyInfos)
-                {
-                    bodyInfo.Updated = false;
-                }
+                // sometimes the depth(Z) of an inferred joint may show as negative
+                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                var position = body.Joints[jointType].Position;
+                if (position.Z < 0)
+                    position.Z = c_InferredZPositionClamp;
+                // map joint position to depth space
+                var depthSpacePoint = coordinateMapper.MapCameraPointToDepthSpace(position);
+                jointPointsInDepthSpace[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                // modify the joint's visibility and location
+                UpdateJoint(bodyInfo.JointPoints[jointType], joints[jointType], jointPointsInDepthSpace[jointType]);
+                // modify hand ellipse colors based on hand states
+                // modity hand ellipse sizes based on tracking confidences
+                if (jointType == JointType.HandRight)
+                    UpdateHand(bodyInfo.HandRightEllipse, body.HandRightState, body.HandRightConfidence, jointPointsInDepthSpace[jointType]);
+                if (jointType == JointType.HandLeft)
+                    UpdateHand(bodyInfo.HandLeftEllipse, body.HandLeftState, body.HandLeftConfidence, jointPointsInDepthSpace[jointType]);
             }
-        }
-        
-        private void UpdateHand(Ellipse ellipse, HandState handState, TrackingConfidence trackingConfidence, Point point)
-        {
-            ellipse.Fill = new SolidColorBrush(HandStateUtilities.HandStateToColor(handState));
-            // draw handstate ellipse based on tracking confidence
-            ellipse.Width = ellipse.Height = (trackingConfidence == TrackingConfidence.Low) ? c_LowConfidenceHandSize : c_HighConfidenceHandSize;
-            ellipse.Visibility = Visibility.Visible;
-            if (!double.IsInfinity(point.X) && !Double.IsInfinity(point.Y))// don't draw handstate if hand joints are not tracked
+            foreach (var bone in bodyInfo.Bones)
             {
-                Canvas.SetLeft(ellipse, point.X - ellipse.Width / 2);
-                Canvas.SetTop(ellipse, point.Y - ellipse.Width / 2);
+                UpdateBone(bodyInfo.BoneLines[bone], joints[bone.Item1], joints[bone.Item2],
+                                jointPointsInDepthSpace[bone.Item1],
+                                jointPointsInDepthSpace[bone.Item2]);
             }
+
+            //if (IsConnected && !ControlLocked) // convert the gestures of the body and send them as a command to the drone
+            //    await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
         }
 
         private void UpdateJoint(Ellipse ellipse, Joint joint, Point point)
@@ -201,14 +389,27 @@ namespace KinectDroneControl.Views
             {
                 if (trackingState == TrackingState.Tracked)
                     ellipse.Fill = new SolidColorBrush(Colors.Green);
-                else
-                    ellipse.Fill = new SolidColorBrush(Colors.Yellow);// inferred joints are yellow
+                else // inferred joints are yellow
+                    ellipse.Fill = new SolidColorBrush(Colors.Yellow);
                 Canvas.SetLeft(ellipse, point.X - c_JointThickness / 2);
                 Canvas.SetTop(ellipse, point.Y - c_JointThickness / 2);
                 ellipse.Visibility = Visibility.Visible;
             }
             else
                 ellipse.Visibility = Visibility.Collapsed;
+        }
+
+        private void UpdateHand(Ellipse ellipse, HandState handState, TrackingConfidence trackingConfidence, Point point)
+        {
+            ellipse.Fill = new SolidColorBrush(HandStateUtilities.HandStateToColor(handState));
+            // draw handstate ellipse based on tracking confidence
+            ellipse.Width = ellipse.Height = (trackingConfidence == TrackingConfidence.Low) ? c_LowConfidenceHandSize : c_HighConfidenceHandSize;
+            ellipse.Visibility = Visibility.Visible;
+            if (!double.IsInfinity(point.X) && !double.IsInfinity(point.Y))// don't draw handstate if hand joints are not tracked
+            {
+                Canvas.SetLeft(ellipse, point.X - ellipse.Width / 2);
+                Canvas.SetTop(ellipse, point.Y - ellipse.Width / 2);
+            }
         }
 
         private void UpdateBone(Line line, Joint startJoint, Joint endJoint, Point startPoint, Point endPoint)
@@ -262,199 +463,49 @@ namespace KinectDroneControl.Views
             m_BottomClipEdge.Visibility = Visibility.Collapsed;
         }
         
-        private void PopulateVisualObjects()
+        private void KinectSensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
         {
-            // create clipped edges and set to collapsed initially
-            m_LeftClipEdge = new Rectangle()
-            {
-                Fill = new SolidColorBrush(Colors.Red),
-                Width = c_ClipBoundsThickness,
-                Height = DisplayGrid.Height,
-                Visibility = Visibility.Collapsed
-            };
-            m_RightClipEdge = new Rectangle()
-            {
-                Fill = new SolidColorBrush(Colors.Red),
-                Width = c_ClipBoundsThickness,
-                Height = DisplayGrid.Height,
-                Visibility = Visibility.Collapsed
-            };
-            m_TopClipEdge = new Rectangle()
-            {
-                Fill = new SolidColorBrush(Colors.Red),
-                Width = DisplayGrid.Width,
-                Height = c_ClipBoundsThickness,
-                Visibility = Visibility.Collapsed
-            };
-            m_BottomClipEdge = new Rectangle()
-            {
-                Fill = new SolidColorBrush(Colors.Red),
-                Width = DisplayGrid.Width,
-                Height = c_ClipBoundsThickness,
-                Visibility = Visibility.Collapsed
-            };
-            foreach (var bodyInfo in m_BodyInfos)
-            {
-                // add left and right hand ellipses of all bodies to canvas
-                m_DrawingCanvas.Children.Add(bodyInfo.HandLeftEllipse);
-                m_DrawingCanvas.Children.Add(bodyInfo.HandRightEllipse);
-                foreach (var joint in bodyInfo.JointPoints)// add joint ellipses of all bodies to canvas
-                {
-                    m_DrawingCanvas.Children.Add(joint.Value);
-                }
-                foreach (var bone in bodyInfo.Bones)// add bone lines of all bodies to canvas
-                {
-                    m_DrawingCanvas.Children.Add(bodyInfo.BoneLines[bone]);
-                }
-            }
-            // add clipped edges rectanges to main canvas
-            m_DrawingCanvas.Children.Add(m_LeftClipEdge);
-            m_DrawingCanvas.Children.Add(m_RightClipEdge);
-            m_DrawingCanvas.Children.Add(m_TopClipEdge);
-            m_DrawingCanvas.Children.Add(m_BottomClipEdge);
-            // position the clipped edges
-            Canvas.SetLeft(m_LeftClipEdge, 0);
-            Canvas.SetTop(m_LeftClipEdge, 0);
-            Canvas.SetLeft(m_RightClipEdge, DisplayGrid.Width - c_ClipBoundsThickness);
-            Canvas.SetTop(m_RightClipEdge, 0);
-            Canvas.SetLeft(m_TopClipEdge, 0);
-            Canvas.SetTop(m_TopClipEdge, 0);
-            Canvas.SetLeft(m_BottomClipEdge, 0);
-            Canvas.SetTop(m_BottomClipEdge, DisplayGrid.Height - c_ClipBoundsThickness);
+            StatusText = m_KinectSensor.IsAvailable ? "Kinect Sensor is running!" : "Kinect Sensor not available!";
         }
+        #endregion
 
-        private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
-        {
-            if (!m_KinectSensor.IsAvailable)
-                StatusText = m_ResourceLoader.GetString("SensorNotAvailableStatusText");
-            else
-                StatusText = m_ResourceLoader.GetString("RunningStatusText");
-        }
-
-        private void UpdateBody(Body body, int bodyIndex)
-        {
-            var joints = body.Joints;
-            var jointPointsInDepthSpace = new Dictionary<JointType, Point>();
-            var bodyInfo = m_BodyInfos[bodyIndex];
-            var coordinateMapper = m_KinectSensor.CoordinateMapper;
-            foreach (var jointType in body.Joints.Keys)
-            {
-                // sometimes the depth(Z) of an inferred joint may show as negative
-                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
-                var position = body.Joints[jointType].Position;
-                if (position.Z < 0)
-                    position.Z = c_InferredZPositionClamp;
-                // map joint position to depth space
-                var depthSpacePoint = coordinateMapper.MapCameraPointToDepthSpace(position);
-                jointPointsInDepthSpace[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
-                // modify the joint's visibility and location
-                UpdateJoint(bodyInfo.JointPoints[jointType], joints[jointType], jointPointsInDepthSpace[jointType]);
-                // modify hand ellipse colors based on hand states
-                // modity hand ellipse sizes based on tracking confidences
-                if (jointType == JointType.HandRight)
-                    UpdateHand(bodyInfo.HandRightEllipse, body.HandRightState, body.HandRightConfidence, jointPointsInDepthSpace[jointType]);
-                if (jointType == JointType.HandLeft)
-                    UpdateHand(bodyInfo.HandLeftEllipse, body.HandLeftState, body.HandLeftConfidence, jointPointsInDepthSpace[jointType]);
-            }
-            foreach (var bone in bodyInfo.Bones)
-            {
-                UpdateBone(bodyInfo.BoneLines[bone], joints[bone.Item1], joints[bone.Item2],
-                                jointPointsInDepthSpace[bone.Item1],
-                                jointPointsInDepthSpace[bone.Item2]);
-            }
-            
-            if (m_Connected && !m_Master) // convert the gestures of the body and send them as a command to the drone
-                SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, m_Flying));
-        }
-      
-        public MainPage()
-        {
-            InitializeDrone();
-            InitializeKinect();
-            DataContext = this;
-            InitializeComponent();
-            m_DrawingCanvas.Clip = new RectangleGeometry();// set the clip rectangle to prevent rendering outside the canvas
-            m_DrawingCanvas.Clip.Rect = new Rect(0.0, 0.0, DisplayGrid.Width, DisplayGrid.Height);
-            PopulateVisualObjects();
-            DisplayGrid.Children.Add(m_DrawingCanvas);
-            ResetFactors();
-            UpdateUIElements();
-            //DataContext = drone;
-            //VideoGrid.Children.Add(DroneVideoElem);
-            //DroneVideoElem.Visibility = Visibility.Collapsed;
-        }
-
+        #region Drone
         private DroneClient m_Drone;
-        private bool m_Connected;
-        private bool m_Flying;
-        private bool m_Master;
-        private float m_GlobalSpeed;
-        private float m_CurveFactor;
-        private const float c_DefaultSpeed = 0.1f;
-        private const float m_DefaultCurveFactor = 0.3f;
+        private double m_GlobalSpeed;
+        private double m_CurveFactor;
+        private const double c_DefaultSpeed = 0.1f;
+        private const double m_DefaultCurveFactor = 0.3f;
         private DispatcherTimer m_BatteryTimer;
-        private DispatcherTimer m_BlinkerTimer;
         //private readonly string videoUrl = "ardrone://192.168.1.1";
         //MediaElement DroneVideoElem;
         private void InitializeDrone()
         {
             m_Drone = DroneClient.Instance;
-            m_Connected = false;
-            m_Flying = false;
-            m_Master = false;
             m_GlobalSpeed = c_DefaultSpeed;
             m_CurveFactor = m_DefaultCurveFactor;
             m_BatteryTimer = new DispatcherTimer();
-            m_BatteryTimer.Tick += BatteryTimerTick;
+            m_BatteryTimer.Tick += BatteryTimer_Tick;
             m_BatteryTimer.Interval = new TimeSpan(0, 0, 5); // 10 seconds
-            m_BlinkerTimer = new DispatcherTimer();
-            m_BlinkerTimer.Tick += BlinkerTimer_Tick;
-            m_BlinkerTimer.Interval = new TimeSpan(0, 0, 0, 0, 500); // 0.5 seconds
             //DroneVideoElem = new MediaElement();
             //DroneVideoElem.MediaFailed += DroneVideoElem_MediaFailed;
         }
 
-        private void globalSpeedSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void GlobalSpeedSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            m_GlobalSpeed = (float)globalSpeedSlider.Value;
+            m_GlobalSpeed = e.NewValue;
         }
 
-        private void curveFactorSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void CurveFactorSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            m_CurveFactor = (float)curveFactorSlider.Value;
+            m_CurveFactor = e.NewValue;
         }
-        
-        private void BatteryTimerTick(object sender, object e)
+
+        private void BatteryTimer_Tick(object sender, object e)
         {
-            if (m_Connected)
+            if (IsConnected)
             {
-                ShowBatteryState(m_Drone.NavigationDataViewModel.BatteryPercentage);
-                if (m_Drone.NavigationDataViewModel.BatteryIsLow.Equals("True"))
-                    m_BlinkerTimer.Start();
+                BatteryState = int.Parse(m_Drone.NavigationDataViewModel.BatteryPercentage);
             }
-            else BatteryTextBlock.Text = "";
-        }
-
-        void BlinkerTimer_Tick(object sender, object e)
-        {
-            if (BatteryTextBlock.Visibility == Visibility.Collapsed) BatteryTextBlock.Visibility = Visibility.Visible;
-            else if (BatteryTextBlock.Visibility == Visibility.Visible) BatteryTextBlock.Visibility = Visibility.Collapsed;
-        }
-
-        private readonly Brush r_BatteryGreen = new SolidColorBrush(Colors.Green);
-        private readonly Brush r_BatteryOrange = new SolidColorBrush(Colors.Orange);
-        private readonly Brush r_BatteryRed = new SolidColorBrush(Colors.Red);
-        private void ShowBatteryState(string percentage)
-        {
-            try
-            {
-                int _percentage = Convert.ToInt32(percentage);
-                if (_percentage >= 65) BatteryTextBlock.Foreground = r_BatteryGreen;
-                else if (_percentage >= 36) BatteryTextBlock.Foreground = r_BatteryOrange;
-                else if (_percentage < 36) BatteryTextBlock.Foreground = r_BatteryRed;
-                BatteryTextBlock.Text = percentage + " %";
-            }
-            catch { BatteryTextBlock.Foreground = new SolidColorBrush(Colors.White); }
         }
 
         private async Task SendGesturesToDrone(KinectInputState gestureCommand)
@@ -463,7 +514,7 @@ namespace KinectDroneControl.Views
             {
                 m_Drone.InputState.Update(0, 0, 0, 0);
                 m_Drone.Land();
-                m_Master = true;
+                ControlLocked = true;
             }
             else if (gestureCommand.Flag == "takeoff")
             {
@@ -472,69 +523,73 @@ namespace KinectDroneControl.Views
                     m_Drone.TakeOff();
                     m_Drone.InputState.Update(0, 0, 0, 0);
                 }
-                else await (new MessageDialog("Battery too low.")).ShowAsync();
+                else
+                    await (new MessageDialog("Battery too low.")).ShowAsync();
             }
             else
             {
-                float speed = 0;
-                if (gestureCommand.SpeedUp > 0) speed = -m_GlobalSpeed;
-                else if (gestureCommand.SpeedUp < 0) speed = m_GlobalSpeed;
-                m_Drone.InputState.Update(gestureCommand.Roll*m_CurveFactor, speed, gestureCommand.Rotate, gestureCommand.Ascend);
+                double speed = 0;
+                if (gestureCommand.SpeedUp > 0)
+                    speed = -m_GlobalSpeed;
+                else if (gestureCommand.SpeedUp < 0)
+                    speed = m_GlobalSpeed;
+                m_Drone.InputState.Update((float)(gestureCommand.Roll * m_CurveFactor), (float)speed, gestureCommand.Rotate, gestureCommand.Ascend);
             }
-            m_Flying = gestureCommand.Flying;
+            IsFlying = gestureCommand.Flying;
             UpdateUIElements();
         }
 
-        private async void ConnectionButton_Click(object sender, RoutedEventArgs e)
+        private async void ConnectDisconnect()
         {
-            if (!m_Connected)
+            if (!IsConnected)
             {
-                if (await m_Drone.ConnectAsync()) 
+                if (await m_Drone.ConnectAsync())
                 {
-                    ShowBatteryState(m_Drone.NavigationDataViewModel.BatteryPercentage);
                     m_BatteryTimer.Start();
-                    m_Connected = true;
-                    m_Master = true;
+                    IsConnected = true;
+                    ControlLocked = true;
                     //ShowDroneCamera();
                 }
-                else await (new MessageDialog("Connection failed...got WLAN-Connection to Drone?")).ShowAsync();
+                else
+                    await (new MessageDialog("Connection failed...got WLAN-Connection to Drone?")).ShowAsync();
             }
             else
             {
                 m_Drone.Dispose();
                 m_Drone.Close();
-                m_Connected = false;
+                IsConnected = false;
             }
             ResetFactors();
             UpdateUIElements();
         }
 
-        private async void TakeoffLandButton_Click(object sender, RoutedEventArgs e)
+        private async void TakeoffLand()
         {
-            if (!m_Flying)
+            if (!IsFlying)
             {
                 if (m_Drone.NavigationDataViewModel.BatteryIsLow.Equals("False"))
                 {
                     m_Drone.TakeOff();
                     m_Drone.InputState.Update(0, 0, 0, 0);
-                    m_Flying = true;
+                    IsFlying = true;
                 }
-                else await (new MessageDialog("Battery too low.")).ShowAsync();
+                else
+                    await (new MessageDialog("Battery too low.")).ShowAsync();
             }
             else
             {
                 m_Drone.InputState.Update(0, 0, 0, 0);
-                m_Master = true;
+                ControlLocked = true;
                 m_Drone.Land();
-                m_Flying = false;
+                IsFlying = false;
             }
             ResetFactors();
             UpdateUIElements();
         }
 
-        private void MasterButton_Click(object sender, RoutedEventArgs e)
+        private void LockControl()
         {
-            m_Master = !m_Master;
+            ControlLocked = !ControlLocked;
             m_Drone.InputState.Update(0, 0, 0, 0);
             ResetFactors();
             UpdateUIElements();
@@ -574,64 +629,29 @@ namespace KinectDroneControl.Views
         private void ResetFactors()
         {
             m_GlobalSpeed = c_DefaultSpeed;
-            globalSpeedSlider.Value = m_GlobalSpeed;
             m_CurveFactor = m_DefaultCurveFactor;
-            curveFactorSlider.Value = m_CurveFactor;
-            //resetControlSliders();
+            ResetControlSliders();
+        }
+
+        private void ResetControlSliders()
+        {
+            m_SpeedupSlider.Value = m_GlobalSpeed;
+            m_CurveSlider.Value = m_CurveFactor;
         }
 
         private readonly Brush r_MasterYellow = new SolidColorBrush(Colors.Yellow);
         private readonly Brush r_TransparentBrush = new SolidColorBrush(Colors.Transparent);
         private void UpdateUIElements()
         {
-            if (m_Connected)
+            if (!IsConnected)
             {
-                if (m_Flying && m_Master)
-                {
-                    ConnectionButton.IsEnabled = false;
-                    TakeoffLandButton.Content = "LAND";
-                    MasterBorder.BorderBrush = r_MasterYellow;
-                }
-                else if (m_Flying)
-                {
-                    ConnectionButton.IsEnabled = false;
-                    TakeoffLandButton.Content = "LAND";
-                    MasterBorder.BorderBrush = r_TransparentBrush;
-                }
-                else if (m_Master)
-                {
-                    ConnectionButton.IsEnabled = true;
-                    TakeoffLandButton.Content = "TAKE OFF";
-                    MasterBorder.BorderBrush = r_MasterYellow;
-                }
-                else
-                {
-                    ConnectionButton.IsEnabled = true;
-                    TakeoffLandButton.Content = "TAKE OFF";
-                    MasterBorder.BorderBrush = r_TransparentBrush;
-                }
-                TakeoffLandButton.IsEnabled = true;
-                MasterButton.IsEnabled = true;
-                globalSpeedSlider.IsEnabled = true;
-                curveFactorSlider.IsEnabled = true;
-                //ChangeViewButton.IsEnabled = true;
-            }
-            else
-            {
-                ConnectionButton.IsEnabled = true;
-                TakeoffLandButton.IsEnabled = false;
-                TakeoffLandButton.Content = "TAKE OFF";
-                MasterBorder.BorderBrush = r_TransparentBrush;
-                MasterButton.IsEnabled = false;
-                globalSpeedSlider.IsEnabled = false;
-                curveFactorSlider.IsEnabled = false;
                 //KinectViewBox.Visibility = Visibility.Visible;
                 //DroneVideoElem.Visibility = Visibility.Collapsed;
                 //ChangeViewButton.IsEnabled = false;
-                BatteryTextBlock.Text = "";
-                m_Flying = false;
-                m_Master = false;
+                IsFlying = false;
+                ControlLocked = false;
             }
         }
+        #endregion
     }
 }

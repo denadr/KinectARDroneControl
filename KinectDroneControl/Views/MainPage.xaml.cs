@@ -329,18 +329,21 @@ namespace KinectDroneControl.Views
             }
             if (dataReceived)
             {
+                bool alreadyUpdatedDefault = false;
                 for (int bodyIndex = 0; bodyIndex < m_Bodies.Length; bodyIndex++)
                 {
                     var body = m_Bodies[bodyIndex];
-                    if (body.IsTracked)
+                    if (body.IsTracked && !alreadyUpdatedDefault)
                     {
                         UpdateClippedEdges(body, hasTrackedBody);
                         await UpdateBody(body, m_BodyInfos[bodyIndex]);
 
                         hasTrackedBody = true;
+                        
+                        alreadyUpdatedDefault = true; // Allow only the first tracked body to be displayed, updated and controling
                     }
                     else
-                        m_BodyInfos[bodyIndex].Clear();// collapse this body from canvas as it goes out of view
+                        m_BodyInfos[bodyIndex].Clear();
                 }
                 if (!hasTrackedBody)
                     ClearClippedEdges();
@@ -378,8 +381,8 @@ namespace KinectDroneControl.Views
                                 jointPointsInDepthSpace[bone.Item2]);
             }
 
-            //if (IsConnected && !ControlLocked) // convert the gestures of the body and send them as a command to the drone
-            //    await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
+            if (IsConnected && !ControlLocked) // convert the gestures of the body and send them as a command to the drone
+                await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
         }
 
         private void UpdateJoint(Ellipse ellipse, Joint joint, Point point)

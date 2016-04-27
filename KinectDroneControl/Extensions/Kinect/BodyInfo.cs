@@ -12,6 +12,7 @@ namespace KinectDroneControl.Extensions.Kinect
     {
         private const double c_JointThickness = 8.0;
 
+        public SolidColorBrush BodyColor { get; private set; }
         public Ellipse HandLeftEllipse { get; set; }
         public Ellipse HandRightEllipse { get; set; }
         public Dictionary<JointType, Ellipse> JointPoints { get; private set; }
@@ -20,7 +21,7 @@ namespace KinectDroneControl.Extensions.Kinect
 
         public BodyInfo(Color bodyColor)
         {
-            var brush = new SolidColorBrush(bodyColor);
+            BodyColor = new SolidColorBrush(bodyColor);
 
             HandLeftEllipse = new Ellipse()
             {
@@ -39,7 +40,7 @@ namespace KinectDroneControl.Extensions.Kinect
                 JointPoints.Add(jointType, new Ellipse()
                 {
                     Visibility = Visibility.Collapsed,
-                    Fill = brush,
+                    Fill = BodyColor,
                     Width = c_JointThickness,
                     Height = c_JointThickness
                 });
@@ -85,7 +86,7 @@ namespace KinectDroneControl.Extensions.Kinect
             {
                 BoneLines.Add(bone, new Line()
                 {
-                    Stroke = brush,
+                    Stroke = BodyColor,
                     Visibility = Visibility.Collapsed
                 });
             }

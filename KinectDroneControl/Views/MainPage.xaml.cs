@@ -329,18 +329,22 @@ namespace KinectDroneControl.Views
             }
             if (dataReceived)
             {
-                bool alreadyUpdatedDefault = false;
+                bool alreadyControlled = false;
                 for (int bodyIndex = 0; bodyIndex < m_Bodies.Length; bodyIndex++)
                 {
                     var body = m_Bodies[bodyIndex];
-                    if (body.IsTracked && !alreadyUpdatedDefault)
+                    if (body.IsTracked)
                     {
                         UpdateClippedEdges(body, hasTrackedBody);
-                        await UpdateBody(body, m_BodyInfos[bodyIndex]);
+                        var jointPointsInDepthSpace = UpdateBody(body, m_BodyInfos[bodyIndex]);
 
                         hasTrackedBody = true;
-                        
-                        alreadyUpdatedDefault = true; // Allow only the first tracked body to be displayed, updated and controling
+
+                        if (/*IsConnected && !ControlLocked && */!alreadyControlled) // convert the gestures of the body and send them as a command to the drone
+                        {
+                            //await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
+                            alreadyControlled = true; // Allow only the first tracked body to control
+                        }
                     }
                     else
                         m_BodyInfos[bodyIndex].Clear();
@@ -350,7 +354,7 @@ namespace KinectDroneControl.Views
             }
         }
 
-        private async Task UpdateBody(Body body, BodyInfo bodyInfo)
+        private Dictionary<JointType, Point> UpdateBody(Body body, BodyInfo bodyInfo)
         {
             var joints = body.Joints;
             var jointPointsInDepthSpace = new Dictionary<JointType, Point>();
@@ -381,8 +385,9 @@ namespace KinectDroneControl.Views
                                 jointPointsInDepthSpace[bone.Item2]);
             }
 
-            if (IsConnected && !ControlLocked) // convert the gestures of the body and send them as a command to the drone
-                await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
+            return jointPointsInDepthSpace;
+            //if (IsConnected && !ControlLocked) // convert the gestures of the body and send them as a command to the drone
+            //    await SendGesturesToDrone(m_Translator.Translate(body.HandLeftState, body.HandRightState, jointPointsInDepthSpace, IsFlying));
         }
 
         private void UpdateJoint(Ellipse ellipse, Joint joint, Point point)

@@ -51,6 +51,7 @@
 
         <!-- Header -->
         <TextBlock 
+            x:Name="HeaderTextBlock"
 			Style="{StaticResource HeaderTextBlockStyle}" 
 			Margin="28"
 			Text="Kinect v2 - A.R. Drone 2.0 - Controller"/>

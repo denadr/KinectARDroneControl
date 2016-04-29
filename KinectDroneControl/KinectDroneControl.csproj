@@ -80,12 +80,16 @@
     <Compile Include="Converter\BatteryIconConverter.cs" />
     <Compile Include="Converter\BooleanInverter.cs" />
     <Compile Include="Converter\FlyingConverter.cs" />
+    <Compile Include="Converter\LockColorConverter.cs" />
     <Compile Include="Converter\LockConverter.cs" />
+    <Compile Include="Extensions\ArDrone\Constants.cs" />
     <Compile Include="Extensions\Kinect\BodyInfo.cs" />
     <Compile Include="Extensions\Kinect\HandStateUtilities.cs" />
-    <Compile Include="KinectDroneInterface\GestureTranslator.cs" />
+    <Compile Include="KinectDroneInterface\HandStateTranslator.cs" />
     <Compile Include="KinectDroneInterface\IGestureTranslator.cs" />
+    <Compile Include="KinectDroneInterface\JoystickTranslator.cs" />
     <Compile Include="KinectDroneInterface\KinectInputState.cs" />
+    <Compile Include="KinectDroneInterface\PoseTranslator.cs" />
     <Compile Include="Views\MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
@@ -136,11 +140,7 @@
       <Private>True</Private>
     </Reference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Extensions\ArDrone\" />
-    <Folder Include="Models\" />
-    <Folder Include="ViewModels\" />
-  </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '12.0' ">
     <VisualStudioVersion>12.0</VisualStudioVersion>
   </PropertyGroup>

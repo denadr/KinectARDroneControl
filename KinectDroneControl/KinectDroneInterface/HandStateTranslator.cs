@@ -22,7 +22,7 @@ namespace KinectDroneControl.KinectDroneInterface
 
                 if (flying)
                 {
-                    // *** land *** (both hands showing lasso?)
+                    // Land (both hands showing lasso?)
                     if (((leftState == HandState.Lasso) && (rightState == HandState.Lasso))
                         && (leftHandY > middleY) && (rightHandY > middleY) 
                         && ApproximatelyEqual(leftHandY, rightHandY))
@@ -32,29 +32,29 @@ namespace KinectDroneControl.KinectDroneInterface
                         return state;
                     }
 
-                    // *** ascend/descend value *** (both hands higher than head / lower than mid?)
+                    // Gaz (both hands higher than head / lower than mid?)
                     if (ApproximatelyEqual(leftHandY, rightHandY)) // hold vertical position
                     {
                         if ((leftHandY > middleY) && (rightHandY > middleY)) // descend
-                            state.Ascend = -Constants.Ascend;
+                            state.Gaz = -Constants.Gaz;
                         else if ((leftHandY < headY) && (rightHandY < headY)) // ascend
-                            state.Ascend = Constants.Ascend;
+                            state.Gaz = Constants.Gaz;
                     }
 
-                    // *** rotate value *** (left hand closed and right hand opened or vice versa?)
+                    // Yaw (left hand closed and right hand opened or vice versa?)
                     if ((leftState == HandState.Closed) && (rightState == HandState.Open)) // rotate left
-                        state.Rotate = -Constants.Rotate;
+                        state.Yaw = -Constants.Yaw;
                     else if ((leftState == HandState.Open) && (rightState == HandState.Closed)) // rotate right
-                        state.Rotate = Constants.Rotate;
+                        state.Yaw = Constants.Yaw;
 
-                    // *** speed value *** (both hands opened/lasso?)
+                    // Pitch (both hands opened/lasso?)
                     if ((leftState == HandState.Open) && (rightState == HandState.Open))
-                        state.SpeedUp = -Constants.Speed; // must be !=null to be set to the global speed value
+                        state.Pitch = -Constants.Pitch;
                     else if ((leftState == HandState.Lasso) || (rightState == HandState.Lasso))
-                        state.SpeedUp = Constants.Speed;
+                        state.Pitch = Constants.Pitch;
 
-                    // *** roll value *** (right hand higher and left hand lower than neck and vice versa?
-                    //                     neck, left hand and right hand approximately equal height?)
+                    // Roll (right hand higher and left hand lower than neck and vice versa?
+                    //       neck, left hand and right hand approximately equal height?)
                     if ((((leftHandY > neckY) && (rightHandY < neckY)) ||
                         ((leftHandY < neckY) && (rightHandY > neckY))) &&
                         !ApproximatelyEqual(leftHandY, rightHandY, neckY)) // dont roll?
@@ -67,7 +67,7 @@ namespace KinectDroneControl.KinectDroneInterface
                 }
                 else
                 {
-                    // *** take off *** (both hands closed and higher than head?)
+                    // Take off (both hands closed and higher than head?)
                     if ((leftState == HandState.Closed) && (rightState == HandState.Closed)
                         && ((leftHandY - headY) < -0.0966) && ((rightHandY - headY) < -0.0966))
                     {

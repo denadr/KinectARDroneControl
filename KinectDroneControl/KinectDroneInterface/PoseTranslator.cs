@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using KinectDroneControl.Extensions.ArDrone;
 using WindowsPreview.Kinect;
 
 namespace KinectDroneControl.KinectDroneInterface
@@ -36,40 +37,40 @@ namespace KinectDroneControl.KinectDroneInterface
                         return state;
                     }
 
-                    // Ascend/Descend
+                    // Gaz
                     if (ApproximatelyEqualDepth(leftHandDepth.Y, rightHandDepth.Y))
                     {
                         if ((leftHandDepth.Y > neckDepth.Y) && (rightHandDepth.Y > neckDepth.Y)) // descend
                         {
-                            state.Ascend = -EstimateAscendFactor(leftHand.Y, rightHand.Y, neck.Y);
+                            state.Gaz = -EstimateGaz(leftHand.Y, rightHand.Y, neck.Y) * Constants.Gaz;
                         }
                         else if ((leftHandDepth.Y < neckDepth.Y) && (rightHandDepth.Y < neckDepth.Y)) // ascend
                         {
-                            state.Ascend = EstimateAscendFactor(leftHand.Y, rightHand.Y, neck.Y);
+                            state.Gaz = EstimateGaz(leftHand.Y, rightHand.Y, neck.Y) * Constants.Gaz;
                         }
                     }
 
                     if (!ApproximatelyEqualCamera(leftHand.Z, neck.Z) &&
                         !ApproximatelyEqualCamera(rightHand.Z, neck.Z))
                     {
-                        // Rotation
+                        // Yaw
                         if (leftHand.Z > neck.Z && rightHand.Z < neck.Z)
                         {
-                            state.Rotate = -EstimateRotateFactor(leftHand.Z, rightHand.Z);
+                            state.Yaw = -EstimateYaw(leftHand.Z, rightHand.Z) * Constants.Yaw;
                         }
                         else if (leftHand.Z < neck.Z && rightHand.Z > neck.Z)
                         {
-                            state.Rotate = EstimateRotateFactor(leftHand.Z, rightHand.Z);
+                            state.Yaw = EstimateYaw(leftHand.Z, rightHand.Z) * Constants.Yaw;
                         }
                         
-                        // Speed
+                        // Pitch
                         else if (leftHand.Z > neck.Z && rightHand.Z > neck.Z)
                         {
-                            state.SpeedUp = EstimateSpeedFactor(leftHand.Z, rightHand.Z, neck.Z);
+                            state.Pitch = EstimatePitch(leftHand.Z, rightHand.Z, neck.Z) * Constants.Pitch;
                         }
                         else if (leftHand.Z < neck.Z && rightHand.Z < neck.Z)
                         {
-                            state.SpeedUp = -EstimateSpeedFactor(leftHand.Z, rightHand.Z, neck.Z);
+                            state.Pitch = -EstimatePitch(leftHand.Z, rightHand.Z, neck.Z) * Constants.Pitch;
                         }
                     }
 
@@ -80,11 +81,11 @@ namespace KinectDroneControl.KinectDroneInterface
                     {
                         if (leftHandDepth.Y > rightHandDepth.Y) // roll left
                         {
-                            state.Roll = -EstimateRollFactor(rightHandDepth.Y, leftHandDepth.Y);
+                            state.Roll = -EstimateRoll(rightHandDepth.Y, leftHandDepth.Y) * Constants.Roll;
                         }
                         else if (leftHandDepth.Y < rightHandDepth.Y) // roll right
                         {
-                            state.Roll = EstimateRollFactor(leftHandDepth.Y, rightHandDepth.Y);
+                            state.Roll = EstimateRoll(leftHandDepth.Y, rightHandDepth.Y) * Constants.Roll;
                         }
                     }
                 }
@@ -105,25 +106,22 @@ namespace KinectDroneControl.KinectDroneInterface
             return state;
         }
 
-        private float EstimateSpeedFactor(float leftZ, float rightZ, float neckZ)
+        private float EstimatePitch(float leftZ, float rightZ, float neckZ)
         {
-            //return Constants.Speed;
             var handsZ = (leftZ + rightZ) / 2;
             var diff = Math.Abs(handsZ - neckZ);
             return diff > 1 ? 1 : diff;
         }
 
-        private float EstimateRotateFactor(float leftZ, float rightZ)
+        private float EstimateYaw(float leftZ, float rightZ)
         {
-            //return Constants.Rotate;
             var diff = Math.Abs(leftZ - rightZ);
             var temp = diff / 2;
             return temp > 1 ? 1 : temp;
         }
 
-        private float EstimateAscendFactor(float leftY, float rightY, float neckY)
+        private float EstimateGaz(float leftY, float rightY, float neckY)
         {
-            //return Constants.Ascend;
             var handsY = (leftY + rightY) / 2;
             var diff = Math.Abs(handsY - neckY);
             return diff > 1 ? 1 : diff;
@@ -146,9 +144,8 @@ namespace KinectDroneControl.KinectDroneInterface
         }
 
         // the lower value has a higher position and vice versa
-        private float EstimateRollFactor(float higherPos, float lowerPos)
+        private float EstimateRoll(float higherPos, float lowerPos)
         {
-            //return Constants.Roll;
             return (1 - higherPos / lowerPos);
         }
     }

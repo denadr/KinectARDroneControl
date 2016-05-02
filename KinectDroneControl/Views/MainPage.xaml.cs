@@ -318,10 +318,10 @@ namespace KinectDroneControl.Views
                             alreadyControlled = true; // Allow only the first tracked body to control
                             AccentColor = new SolidColorBrush(m_BodyColors[bodyIndex]);
                             // DEBUG
-                            //AscendBlock.Text = "Ascend: " + state.Ascend;
-                            //SpeedBlock.Text = "Speed: " + state.SpeedUp;
-                            //RotateBlock.Text = "Rotate: " + state.Rotate;
-                            //RollBlock.Text = "Roll: " + state.Roll;
+                            //m_GazBlock.Text = "Gaz: " + state.Gaz;
+                            //m_PitchBlock.Text = "Pitch: " + state.Pitch;
+                            //m_YawBlock.Text = "Yaw: " + state.Yaw;
+                            //m_RollBlock.Text = "Roll: " + state.Roll;
                         }
                     }
                     else
@@ -429,7 +429,7 @@ namespace KinectDroneControl.Views
         private void InitializeDrone()
         {
             m_Drone = DroneClient.Instance;
-            m_Drone.SetIndoorConfiguration();
+            //m_Drone.SetIndoorConfiguration();
 
             m_BatteryTimer = new DispatcherTimer();
             m_BatteryTimer.Tick += BatteryTimer_Tick;
@@ -466,7 +466,7 @@ namespace KinectDroneControl.Views
             }
             else
             {
-                m_Drone.InputState.Update(gestureCommand.Roll, gestureCommand.SpeedUp, gestureCommand.Rotate, gestureCommand.Ascend);
+                m_Drone.InputState.Update(gestureCommand.Roll, gestureCommand.Pitch, gestureCommand.Yaw, gestureCommand.Gaz);
             }
             IsFlying = gestureCommand.Flying;
         }
@@ -481,24 +481,24 @@ namespace KinectDroneControl.Views
             m_Translator = new PoseTranslator();
         }
 
-        private void GlobalSpeedSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void PitchSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            Constants.Speed = (float)e.NewValue / 10;
+            Constants.Pitch = (float)e.NewValue / 10;
         }
 
-        private void CurveFactorSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void RollSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             Constants.Roll = (float)e.NewValue / 10;
         }
 
-        private void RotateSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void YawSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            Constants.Rotate = (float)e.NewValue / 10;
+            Constants.Yaw = (float)e.NewValue / 10;
         }
 
-        private void AscendSliderValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void GazSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            Constants.Ascend = (float)e.NewValue / 10;
+            Constants.Gaz = (float)e.NewValue / 10;
         }
 
         private void ResetFactors()
@@ -509,10 +509,10 @@ namespace KinectDroneControl.Views
 
         private void ResetControlSliders()
         {
-            m_SpeedupSlider.Value = Constants.Speed * 10;
-            m_CurveSlider.Value = Constants.Roll * 10;
-            m_RotateSlider.Value = Constants.Rotate * 10;
-            m_AscendSlider.Value = Constants.Ascend * 10;
+            m_PitchSlider.Value = Constants.Pitch * 10;
+            m_RollSlider.Value = Constants.Roll * 10;
+            m_YawSlider.Value = Constants.Yaw * 10;
+            m_GazSlider.Value = Constants.Gaz * 10;
         }
 
         private async void ConnectDisconnect()
@@ -525,7 +525,7 @@ namespace KinectDroneControl.Views
             {
                 DisconnectDrone();
             }
-            ResetFactors();
+            //ResetFactors();
         }
 
         private async Task ConnectDrone()
@@ -558,7 +558,7 @@ namespace KinectDroneControl.Views
             {
                 Land();
             }
-            ResetFactors();
+            //ResetFactors();
         }
 
         private async Task Takeoff()
@@ -586,7 +586,7 @@ namespace KinectDroneControl.Views
             ControlLocked = !ControlLocked;
             if (IsFlying)
                 m_Drone.InputState.Update(0, 0, 0, 0);
-            ResetFactors();
+            //ResetFactors();
         }
 
         //private void ChangeViewButton_Click(object sender, RoutedEventArgs e)

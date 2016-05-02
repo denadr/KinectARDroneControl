@@ -134,57 +134,57 @@
 					HorizontalAlignment="Center" 
 					VerticalAlignment="Top"
                     Margin="60 0 0 0">
-                    <!-- Speed Up -->
+                    <!-- Pitch -->
                     <TextBlock 
-                        x:Name="SpeedBlock"
+                        x:Name="m_PitchBlock"
 						HorizontalAlignment="Left" 
 						FontSize="16"
-						Text="Speed:"/>
+						Text="Pitch:"/>
                     <Slider 
-                        x:Name="m_SpeedupSlider"
+                        x:Name="m_PitchSlider"
                         IsEnabled="{Binding IsConnected}"
 						Style="{StaticResource SliderStyle}"
 						Foreground="{Binding AccentColor}"
-                        ValueChanged="GlobalSpeedSliderValueChanged"/>
+                        ValueChanged="PitchSlider_ValueChanged"/>
                     
                      <!-- Roll -->
                     <TextBlock 
-                        x:Name="RollBlock"
+                        x:Name="m_RollBlock"
 						HorizontalAlignment="Left" 
 						FontSize="16"
 						Text="Roll:"/>
                     <Slider 
-                        x:Name="m_CurveSlider"
+                        x:Name="m_RollSlider"
                         IsEnabled="{Binding IsConnected}"
 						Style="{StaticResource SliderStyle}"
 						Foreground="{Binding AccentColor}"
-                        ValueChanged="CurveFactorSliderValueChanged"/>
+                        ValueChanged="RollSlider_ValueChanged"/>
 
-                    <!-- Rotate -->
+                    <!-- Yaw -->
                     <TextBlock 
-                        x:Name="RotateBlock"
+                        x:Name="m_YawBlock"
 						HorizontalAlignment="Left" 
 						FontSize="16"
-						Text="Rotate:"/>
+						Text="Yaw:"/>
                     <Slider 
-                        x:Name="m_RotateSlider"
+                        x:Name="m_YawSlider"
                         IsEnabled="{Binding IsConnected}"
 						Style="{StaticResource SliderStyle}"
 						Foreground="{Binding AccentColor}"
-                        ValueChanged="RotateSliderValueChanged"/>
+                        ValueChanged="YawSlider_ValueChanged"/>
 
-                    <!-- Ascend -->
+                    <!-- Gaz -->
                     <TextBlock 
-                        x:Name="AscendBlock"
+                        x:Name="m_GazBlock"
 						HorizontalAlignment="Left" 
 						FontSize="16"
-						Text="Ascend:"/>
+						Text="Gaz:"/>
                     <Slider
-                        x:Name="m_AscendSlider"
+                        x:Name="m_GazSlider"
                         IsEnabled="{Binding IsConnected}"
 						Style="{StaticResource SliderStyle}"
 						Foreground="{Binding AccentColor}"
-                        ValueChanged="AscendSliderValueChanged"/>
+                        ValueChanged="GazSlider_ValueChanged"/>
                 </StackPanel>
 
                 <!-- Status -->

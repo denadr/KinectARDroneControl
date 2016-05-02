@@ -2,21 +2,30 @@
 {
     class KinectInputState
     {
-        public float SpeedUp;
+        public float Pitch;
         public float Roll;
-        public float Rotate;
-        public float Ascend;
+        public float Yaw;
+        public float Gaz;
+
         public bool Flying;
-        public string Flag;
-        public KinectInputState(bool flies, float speed = 0, float roll = 0, 
-                                float rotate = 0, float ascend = 0, string flag = "")
+        public InputStateMode Mode;
+
+        public KinectInputState(bool flies, float pitch = 0, float roll = 0, 
+                                float yaw = 0, float gaz = 0, InputStateMode mode = InputStateMode.Control)
         {
-            SpeedUp = speed;
+            Pitch = pitch;
             Roll = roll;
-            Rotate = rotate;
-            Ascend = ascend;
+            Yaw = yaw;
+            Gaz = gaz;
             Flying = flies;
-            Flag = flag;
+            Mode = mode;
         }
+    }
+
+    enum InputStateMode
+    {
+        Takeoff,
+        Land,
+        Control
     }
 }

@@ -1,38 +1,14 @@
 ﻿<Page
-    x:Class="KinectDroneControl.Views.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:KinectDroneControl"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:vm="using:KinectDroneControl.ViewModels"
+    x:Class="KinectDroneControl.Views.MainPage"
     mc:Ignorable="d"
-    Unloaded="MainPage_Unloaded">
-    
-    <Page.Resources>
-        <SolidColorBrush x:Key="MediumGreyBrush" Color="#ff6e6e6e" />
-        <SolidColorBrush x:Key="KinectPurpleBrush" Color="#ff52318f" />
-        <SolidColorBrush x:Key="KinectBlueBrush" Color="#ff00BCF2" />
-        <Style TargetType="Button" x:Key="ButtonStyle">
-            <Setter Property="Width" Value="200"/>
-            <Setter Property="Height" Value="200"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontFamily" Value="Calibri"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="28"/>
-            <Setter Property="Margin" Value="60,0,60,0"/>
-        </Style>
-        <Style TargetType="Slider" x:Key="SliderStyle">
-            <Setter Property="TickFrequency" Value=".1"/>
-            <Setter Property="Minimum" Value="0"/>
-            <Setter Property="Maximum" Value="1"/>
-            <Setter Property="Value" Value="0"/>
-            <Setter Property="Width" Value="260"/>
-        </Style>
-    </Page.Resources>
+    Unloaded="MainPage_Unloaded"
+    MinHeight="800" MinWidth="1280">
 
-    <Grid Background="Black" >
+    <Grid Background="Black">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -40,31 +16,38 @@
 
         <!-- Header -->
         <TextBlock 
-            Style="{StaticResource HeaderTextBlockStyle}" 
-            Margin="28"
-            Text="Kinect v2 - A.R. Drone 2.0 - Controller"/>
+            x:Name="HeaderTextBlock"
+			Style="{StaticResource HeaderTextBlockStyle}" 
+			Margin="28"
+			Text="Kinect v2 - A.R. Drone 2.0 - Controller"/>
 
         <StackPanel 
-            Orientation="Horizontal" 
-            HorizontalAlignment="Right">
+			Orientation="Horizontal" 
+			HorizontalAlignment="Right">
             <!-- Battery -->
+            <TextBlock
+				x:Name="BatteryTextBlock2"
+				FontSize="20"
+				Margin="20, 40, 0, 0"
+                Text="{Binding BatteryState, Converter={StaticResource BatteryConverter}}"/>
             <TextBlock 
-                x:Name="BatteryTextBlock" 
-                Text="" 
-                FontSize="24" 
-                VerticalAlignment="Center" 
-                Margin="20"/>
+				x:Name="BatteryTextBlock" 
+				FontSize="40"
+				VerticalAlignment="Center" 
+				Margin="20"
+                FontFamily="Segoe MDL2 Assets"
+                Text="{Binding BatteryState, Converter={StaticResource BatteryIconConverter}}"/>
             <!-- Change View -->
             <!--<Button 
-                x:Name="ChangeViewButton" 
-                Background="Transparent" 
-                Click="ChangeViewButton_Click"
-                Margin="20" 
-                IsEnabled="False" 
-                Height="48"
-                Content="Change View"/>-->
+				x:Name="ChangeViewButton" 
+				Background="Transparent" 
+				Margin="20" 
+				IsEnabled="False" 
+				Height="48"
+				FontFamily="Segoe MDL2 Assets"
+				Content="&#xE89A;"/>-->
         </StackPanel>
-        
+
         <!-- Content -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
@@ -74,123 +57,177 @@
 
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Connect -->
-                <Button 
-                    Style="{StaticResource ButtonStyle}" 
-                    FontFamily="Segoe MDL2 Assets"
-                    FontSize="48"
-                    VerticalAlignment="Bottom" 
-                    x:Name="ConnectionButton" 
-                    Click="ConnectionButton_Click"
-                    Content="&#xE71B;"/>
+                <StackPanel
+                    Margin="0, 12, 0, 0"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Grid.Row="0">
+                    <!-- Connect -->
+                    <Button 
+					    Style="{StaticResource ButtonStyle}" 
+					    FontFamily="Segoe MDL2 Assets"
+					    FontSize="48"
+					    x:Name="ConnectionButton" 
+					    Content="&#xE71B;"
+					    Command="{Binding ConnectDisconnectCommand}"
+                        IsEnabled="{Binding IsFlying, Converter={StaticResource BooleanInverter}}"/>
+
+                        <!-- Lock Control -->
+                        <Button 
+					        Style="{StaticResource ButtonStyle}" 
+					        IsEnabled="{Binding IsConnected}"
+					        Command="{Binding ControlLockCommand}"
+                            Background="{Binding ControlLocked, Converter={StaticResource LockColorConverter}}">
+                        <TextBlock 
+					        TextAlignment="Center"
+						    FontFamily="Segoe MDL2 Assets" 
+						    FontSize="48" 
+						    FontWeight="Bold" 
+						    Margin="4"
+                            Text="{Binding ControlLocked, Converter={StaticResource LockConverter}}"/>
+                    </Button>
+                </StackPanel>
                 
                 <!-- Take off / Land -->
                 <Button 
-                    Grid.Row="1" 
-                    Style="{StaticResource ButtonStyle}" 
-                    IsEnabled="False"
-                    VerticalAlignment="Center" 
-                    x:Name="TakeoffLandButton" 
-                    Click="TakeoffLandButton_Click"
-                    Content="TAKE OFF"/>
+					Grid.Row="1" 
+                    HorizontalAlignment="Center"
+					Style="{StaticResource ButtonStyleWidth}" 
+					IsEnabled="{Binding IsConnected}"
+					Command="{Binding TakeoffLandCommand}"
+                    Content="{Binding IsFlying, Converter={StaticResource FlyingConverter}}"/>
 
-                <!-- Master Control -->
-                <Button 
-                    Grid.Row="2" 
-                    Style="{StaticResource ButtonStyle}" 
-                    Background="Red" 
-                    VerticalAlignment="Top"
-                    x:Name="MasterButton" 
-                    Click="MasterButton_Click" 
-                    IsEnabled="False">
-                    <Border 
-                        x:Name="MasterBorder" 
-                        BorderBrush="Transparent" 
-                        BorderThickness="4">
-                        <TextBlock 
-                            Text="&#xE8D7;" 
-                            TextWrapping="Wrap" 
-                            TextAlignment="Center"
-                            FontFamily="Segoe MDL2 Assets" 
-                            FontSize="48" 
-                            FontWeight="Bold" 
-                            Margin="4"/>
-                    </Border>
-                </Button>
+                <StackPanel 
+                    Orientation="Vertical" 
+                    Grid.Row="2"
+                    VerticalAlignment="Center">
+                    <TextBlock 
+                        Text="Metaphor:"
+						FontSize="16"
+                        Margin="60 0 0 0"/>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton
+                            Content="Hand States"
+						    FontSize="16"
+                            Margin="60 20 0 0"
+                            IsEnabled="{Binding IsFlying, Converter={StaticResource BooleanInverter}}"
+                            Checked="HandStates_Checked"
+                            IsChecked="True"/>
+                        <RadioButton
+                            Content="Pose"
+						    FontSize="16"
+                            Margin="60 20 0 0"
+                            IsEnabled="{Binding IsFlying, Converter={StaticResource BooleanInverter}}"
+                            Checked="Pose_Checked"/>
+                    </StackPanel>
+                </StackPanel>
                 
                 <StackPanel 
-                    Grid.Row="3" 
-                    HorizontalAlignment="Center" 
-                    VerticalAlignment="Top">
-                    <!-- Speed Up -->
+					Grid.Row="3" 
+					HorizontalAlignment="Center" 
+					VerticalAlignment="Top"
+                    Margin="60 0 0 0">
+                    <!-- Pitch -->
                     <TextBlock 
-                        HorizontalAlignment="Left" 
-                        FontSize="16"
-                        Text="Speed-Up:"/>
+                        x:Name="m_PitchBlock"
+						HorizontalAlignment="Left" 
+						FontSize="16"
+						Text="Pitch:"/>
                     <Slider 
-                        x:Name="globalSpeedSlider"
-                        Style="{StaticResource SliderStyle}"
-                        ValueChanged="globalSpeedSliderValueChanged" 
-                        IsEnabled="False" 
-                        Foreground="{StaticResource KinectPurpleBrush}"/>
-                    <!-- Curve -->
+                        x:Name="m_PitchSlider"
+                        IsEnabled="{Binding IsConnected}"
+						Style="{StaticResource SliderStyle}"
+						Foreground="{Binding AccentColor}"
+                        ValueChanged="PitchSlider_ValueChanged"/>
+                    
+                     <!-- Roll -->
                     <TextBlock 
-                        HorizontalAlignment="Left" 
-                        FontSize="16"
-                        Text="Curve:"/>
+                        x:Name="m_RollBlock"
+						HorizontalAlignment="Left" 
+						FontSize="16"
+						Text="Roll:"/>
                     <Slider 
-                        x:Name="curveFactorSlider" 
-                        Style="{StaticResource SliderStyle}"
-                        ValueChanged="curveFactorSliderValueChanged" 
-                        IsEnabled="False" 
-                        Foreground="{StaticResource KinectPurpleBrush}"/>
+                        x:Name="m_RollSlider"
+                        IsEnabled="{Binding IsConnected}"
+						Style="{StaticResource SliderStyle}"
+						Foreground="{Binding AccentColor}"
+                        ValueChanged="RollSlider_ValueChanged"/>
+
+                    <!-- Yaw -->
+                    <TextBlock 
+                        x:Name="m_YawBlock"
+						HorizontalAlignment="Left" 
+						FontSize="16"
+						Text="Yaw:"/>
+                    <Slider 
+                        x:Name="m_YawSlider"
+                        IsEnabled="{Binding IsConnected}"
+						Style="{StaticResource SliderStyle}"
+						Foreground="{Binding AccentColor}"
+                        ValueChanged="YawSlider_ValueChanged"/>
+
+                    <!-- Gaz -->
+                    <TextBlock 
+                        x:Name="m_GazBlock"
+						HorizontalAlignment="Left" 
+						FontSize="16"
+						Text="Gaz:"/>
+                    <Slider
+                        x:Name="m_GazSlider"
+                        IsEnabled="{Binding IsConnected}"
+						Style="{StaticResource SliderStyle}"
+						Foreground="{Binding AccentColor}"
+                        ValueChanged="GazSlider_ValueChanged"/>
                 </StackPanel>
 
                 <!-- Status -->
                 <StackPanel 
-                    Grid.Row="4" 
-                    Background="Transparent" 
-                    x:Name="statusBar">
+					Grid.Row="4" 
+                    VerticalAlignment="Bottom"
+					Background="Transparent" 
+					x:Name="statusBar">
                     <TextBlock 
-                        Text="{Binding StatusText}" 
-                        Foreground="{StaticResource MediumGreyBrush}"
-                        FontSize="16" 
-                        Margin="12,0,0,0" 
-                        x:Name="statusTextBlock"/>
+						Text="{Binding StatusText}" 
+						Foreground="#ff6e6e6e"
+						FontSize="16" 
+						Margin="12,0,0,0" 
+						x:Name="statusTextBlock"/>
+                    <!--<TextBlock
+                        x:Name="m_Debug"
+						FontSize="16" 
+						Margin="12,0,0,0" 
+                        Text="DEBUG"/>-->
                 </StackPanel>
             </Grid>
 
             <!-- Kinect -->
             <Viewbox 
-                Grid.Column="1" 
-                HorizontalAlignment="Center" >
-                <!--x:Name="KinectViewBox"-->
+				Grid.Column="1" 
+				HorizontalAlignment="Center" >
                 <Border 
-                    BorderBrush="{StaticResource KinectPurpleBrush}" 
-                    BorderThickness="4" 
-                    Margin="8">
+					BorderBrush="{Binding AccentColor}" 
+					BorderThickness="4" 
+					Margin="8">
                     <Grid 
-                        x:Name="DisplayGrid" 
-                        Background="Transparent" 
-                        Width="512" 
-                        Height="414"/>
+						x:Name="DisplayGrid" 
+						Background="Transparent" 
+						Width="512" 
+						Height="414"/>
                 </Border>
             </Viewbox>
-            
+
             <!-- Drone -->
-            <Grid 
-                Grid.Column="1" 
-                x:Name="VideoGrid" 
-                Background="Transparent">
-            </Grid>
-            
+            <!--<Grid 
+				Grid.Column="1" 
+				x:Name="VideoGrid" 
+				Background="Transparent"/>-->
             <!--<MediaElement 
                 x:Name="DroneVideoElem" 
                 RealTimePlayback="True" 
@@ -200,7 +237,6 @@
                 Source="ardrone://192.168.1.1"
                 VerticalAlignment="Stretch" 
                 HorizontalAlignment="Stretch"/>-->
-            
         </Grid>
     </Grid>
 </Page>
